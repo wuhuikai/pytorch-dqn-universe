@@ -97,6 +97,11 @@ def main():
     
     observation_n, reward_n, done_n, info = reset(env)
     for step in range(args.n_steps):
+        if step % 1000 == 0:
+            print('#'*10)
+            print('Step: {}'.format(step))
+            print('#'*10)
+
         action = dqn.perceive(observation_n[0]['vision'], reward_n[0], done_n[0], step)
         next_observation_n, reward_n, done_n, info = env.step([env.action_space[action]])
 
@@ -116,7 +121,7 @@ def main():
             eval_observation_n, eval_reward_n, eval_done_n, _ = reset(env)
             for eval_step in range(args.eval_steps):
                 eval_action = dqn.perceive(eval_observation_n[0]['vision'], eval_reward_n[0], eval_done_n[0], eval_step, True, 0.05)
-                eval_observation_n, eval_reward_n, eval_done_n, _ = env.step([env.action_space[action]])   
+                eval_observation_n, eval_reward_n, eval_done_n, _ = env.step([env.action_space[eval_action]])   
                 
                 total_reward += eval_reward_n[0]
                 if eval_done_n[0] or eval_observation_n[0] is None:
