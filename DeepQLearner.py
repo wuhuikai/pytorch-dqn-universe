@@ -82,7 +82,8 @@ class DeepQLearner(object):
         if n_steps > self.args.learn_start and n_steps % self.args.update_freq == 0:
             self.args.lr = max((self.args.lr_start-self.args.lr_end)*(self.args.lr_end_time-max(0, n_steps-self.args.learn_start))/self.args.lr_end_time
                              + self.args.lr_end, self.args.lr_end)
-            self.optimizer.lr = self.args.lr
+            for group in self.optimizer.param_groups:
+                group['lr'] = self.args.lr
 
             for _ in range(self.args.n_replay):
                 self.q_learning_minibatch()
