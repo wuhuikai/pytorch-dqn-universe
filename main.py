@@ -141,7 +141,7 @@ def main():
             if not os.path.isdir(args.experiment):
                 os.makedirs(args.experiment)
             torch.save(dqn.network.state_dict(), '%s/DQN_iter_%d.pth' % (args.experiment, step))
-            if not best_network is None
+            if not best_network is None:
                 torch.save(best_network.state_dict(), '%s/X_DQN_iter_%d.pth' % (args.experiment, step))
 
             with open(os.path.join(args.experiment, 'log'), 'w') as f:
