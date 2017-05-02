@@ -125,7 +125,7 @@ def main():
 
             total_reward /= max(1, n_episodes)
             best_reward = None if len(history) == 0 else history[-1]['best_reward']
-            if best_network == None or total_reward > best_reward:
+            if best_network is None or total_reward > best_reward:
                 best_network = copy.deepcopy(dqn.network)
                 best_reward = total_reward
 
@@ -141,7 +141,8 @@ def main():
             if not os.path.isdir(args.experiment):
                 os.makedirs(args.experiment)
             torch.save(dqn.network.state_dict(), '%s/DQN_iter_%d.pth' % (args.experiment, step))
-            torch.save(best_network.state_dict(), '%s/X_DQN_iter_%d.pth' % (args.experiment, step))
+            if not best_network is None
+                torch.save(best_network.state_dict(), '%s/X_DQN_iter_%d.pth' % (args.experiment, step))
 
             with open(os.path.join(args.experiment, 'log'), 'w') as f:
                 f.write(pprint.pformat(history))
