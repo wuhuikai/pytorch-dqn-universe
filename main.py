@@ -86,9 +86,9 @@ def main():
 
     args.n_actions = len(env.action_space.actions)
 
-    eval_env = gym.make(args.game_name)
-    eval_env.configure(remotes=1)
-    eval_env = wrappers.experimental.SafeActionSpace(eval_env)
+    # eval_env = gym.make(args.game_name)
+    # eval_env.configure(remotes=1)
+    # eval_env = wrappers.experimental.SafeActionSpace(eval_env)
 
     dqn = DeepQLearner(args)
 
@@ -113,15 +113,15 @@ def main():
         if step % args.eval_intervel == 0 and step > args.learn_start:
             total_reward, n_episodes = 0, 0
         
-            eval_observation_n, eval_reward_n, eval_done_n, _ = reset(eval_env)
+            eval_observation_n, eval_reward_n, eval_done_n, _ = reset(env)
             for eval_step in range(args.eval_steps):
                 eval_action = dqn.perceive(eval_observation_n[0]['vision'], eval_reward_n[0], eval_done_n[0], eval_step, True, 0.05)
-                eval_observation_n, eval_reward_n, eval_done_n, _ = eval_env.step([eval_env.action_space[action]])   
+                eval_observation_n, eval_reward_n, eval_done_n, _ = env.step([env.action_space[action]])   
                 
                 total_reward += eval_reward_n[0]
                 if eval_done_n[0] or eval_observation_n[0] is None:
                     n_episodes += 1
-                    eval_observation_n, eval_reward_n, eval_done_n, _ = reset(eval_env)
+                    eval_observation_n, eval_reward_n, eval_done_n, _ = reset(env)
 
             total_reward /= max(1, n_episodes)
             best_reward = None if len(history) == 0 else history[-1]['best_reward']
