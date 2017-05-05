@@ -45,7 +45,7 @@ class DeepQLearner(object):
         )
 
         if self.args.gpu >= 0:
-            self.network = self.network.cuda()
+            self.network = self.network.cuda(self.args.gpu)
 
         self.optimizer = optim.RMSprop(self.network.parameters(), lr=self.args.lr, momentum=0.95, alpha=0.95, eps=0.01, weight_decay=self.args.weight_decay)
 
@@ -57,6 +57,18 @@ class DeepQLearner(object):
         input = rgb2yuv(input)[:,:,0]
 
         return input
+
+    def reset(self, reward):
+        self.transitions.reset_recent()
+
+        if not self.args.no_rescale_reward:
+            self.r_max = max(self.r_max, reward)
+        if not self.last_state is None:
+            reward = np.clip(reward, self.args.min_reward, self.args.max_reward)
+            self.transitions.add(self.last_state, self.last_action, reward, self.last_done)
+            self.transitions.add(self.last_state, self.last_action, 0, True)
+
+        self.last_state, self.last_action, self.last_done = None, None, None
 
     def perceive(self, raw_state, reward, done, n_steps, test=False, test_eps=None):
         state = self.preprocess(raw_state)
@@ -104,7 +116,7 @@ class DeepQLearner(object):
     def greedy(self, state):
         state = torch.from_numpy(state)
         if self.args.gpu >= 0:
-            state = state.cuda()
+            state = state.cuda(self.args.gpu)
         state_var = Variable(state, volatile=True)
         q = self.network(state_var).data.cpu().squeeze().numpy()
         action = np.random.choice(np.where(q == max(q))[0])

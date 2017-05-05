@@ -20,16 +20,21 @@ class TransitionManager(object):
 
         self.buffer_idx = None
         self.state_buffer = torch.FloatTensor(self.args.buffer_size, self.args.n_input_channels, self.args.im_size, self.args.im_size).zero_()
-        self.done_buffer = torch.FloatTensor(self.args.buffer_size).zero_()
         self.action_buffer = torch.LongTensor(self.args.buffer_size).zero_()
         self.reward_buffer = torch.FloatTensor(self.args.buffer_size).zero_()
         self.next_state_buffer = torch.FloatTensor(self.args.buffer_size, self.args.n_input_channels, self.args.im_size, self.args.im_size).zero_()
+        self.done_buffer = torch.FloatTensor(self.args.buffer_size).zero_()
         if self.args.gpu >= 0:
-            self.state_buffer, self.next_state_buffer, self.reward_buffer, self.done_buffer, self.action_buffer = self.state_buffer.cuda(), self.next_state_buffer.cuda(), self.reward_buffer.cuda(), self.done_buffer.cuda(), self.action_buffer.cuda()
+            self.state_buffer, self.next_state_buffer, self.reward_buffer, self.action_buffer, sel.done_buffer = self.state_buffer.cuda(self.args.gpu), self.next_state_buffer.cuda(self.args.gpu), self.reward_buffer.cuda(self.args.gpu), self.action_buffer.cuda(self.args.gpu), self.done_buffer.cuda(self.args.gpu)
 
         self.recent_states = []
         self.recent_dones = []
         self.recent_actions = []
+
+    def reset_recent(self):
+        self.recent_states = []
+        self.recent_dones = []
+        self.recent_actions = []        
 
     def add_recent_state(self, state, done):
         state = np.asarray(state*255, dtype=np.uint8)
@@ -96,20 +101,18 @@ class TransitionManager(object):
         idx = self.buffer_idx
         self.buffer_idx += batch_size
 
-        return self.state_buffer[idx:idx+batch_size], self.action_buffer[idx:idx+batch_size], self.reward_buffer[idx:idx+batch_size], self.next_state_buffer[idx:idx+batch_size], self.done_buffer[idx:idx+batch_size]
+        return self.state_buffer[idx:self.buffer_idx], self.action_buffer[idx:self.buffer_idx], self.reward_buffer[idx:self.buffer_idx], self.next_state_buffer[idx:self.buffer_idx], self.done_buffer[idx:self.buffer_idx]
 
     def sample_one(self):
-        idx, valid = 0, False
-
         while True:
-            idx = np.random.randint(1, self.n_states - self.args.recent_mem_size)
-            if self.dones[idx+self.args.recent_mem_size-1] == 0:
+            idx = np.random.randint(0, self.n_states - self.args.recent_mem_size)
+            if not self.dones[idx+self.hist_idx[-1]]:
                 break
 
         return self.get(idx)
 
     def get(self, idx):
-        action_reward_idx = idx + self.args.recent_mem_size-1
+        action_reward_idx = idx + self.hist_idx[-1]
         return self.concat_frames(idx), self.actions[action_reward_idx], self.rewards[action_reward_idx], self.concat_frames(idx+1), self.dones[action_reward_idx+1]
 
     def fill_buffer(self):

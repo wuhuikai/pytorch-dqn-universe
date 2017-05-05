@@ -39,6 +39,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=32)
 
     parser.add_argument('--update_freq', type=int, default=4)
+    parser.add_argument('--action_repeat', type=int, default=4)
     parser.add_argument('--n_replay', type=int, default=1, help='# of replays per update')
     
     parser.add_argument('--replay_memory', type=int, default=1000000, help='Size of replay memory')
@@ -86,10 +87,6 @@ def main():
 
     args.n_actions = len(env.action_space.actions)
 
-    # eval_env = gym.make(args.game_name)
-    # eval_env.configure(remotes=1)
-    # eval_env = wrappers.experimental.SafeActionSpace(eval_env)
-
     dqn = DeepQLearner(args)
 
     history = []
@@ -103,17 +100,18 @@ def main():
             print('#'*10)
 
         action = dqn.perceive(observation_n[0]['vision'], reward_n[0], done_n[0], step)
-        next_observation_n, reward_n, done_n, info = env.step([env.action_space[action]])
 
-        if done_n[0] or next_observation_n[0] is None:
-            action = dqn.perceive(observation_n[0]['vision'], reward_n[0], done_n[0], step)
-            observation_n, reward_n, done_n, info = reset(env)
-        else:
-            observation_n = next_observation_n
+        for _ in range(args.action_repeat):
+            observation_n, reward_n, done_n, info = env.step([env.action_space[action]])
+            if done_n[0]:
+                dqn.reset(reward_n[0])
+                observation_n, reward_n, done_n, info = reset(env)
+                break
 
         if step == args.learn_start:
             state_eval, action_eval, rewards_eval, next_state_eval, done_eval = dqn.transitions.sample(args.eval_size)
             state_eval, action_eval, rewards_eval, next_state_eval, done_eval = state_eval.clone(), action_eval.clone(), rewards_eval.clone(), next_state_eval.clone(), done_eval.clone()
+
 
         if step % args.eval_intervel == 0 and step > args.learn_start:
             total_reward, n_episodes = 0, 0
@@ -121,12 +119,14 @@ def main():
             eval_observation_n, eval_reward_n, eval_done_n, _ = reset(env)
             for eval_step in range(args.eval_steps):
                 eval_action = dqn.perceive(eval_observation_n[0]['vision'], eval_reward_n[0], eval_done_n[0], eval_step, True, 0.05)
-                eval_observation_n, eval_reward_n, eval_done_n, _ = env.step([env.action_space[eval_action]])   
-                
-                total_reward += eval_reward_n[0]
-                if eval_done_n[0] or eval_observation_n[0] is None:
-                    n_episodes += 1
-                    eval_observation_n, eval_reward_n, eval_done_n, _ = reset(env)
+
+                for _ in range(args.action_repeat):
+                    eval_observation_n, eval_reward_n, eval_done_n, _ = env.step([env.action_space[eval_action]])   
+                    total_reward += eval_reward_n[0]
+                    if eval_done_n[0]:
+                        n_episodes += 1
+                        eval_observation_n, eval_reward_n, eval_done_n, _ = reset(env)
+                        break
 
             total_reward /= max(1, n_episodes)
             best_reward = None if len(history) == 0 else history[-1]['best_reward']
@@ -147,7 +147,7 @@ def main():
                 os.makedirs(args.experiment)
             torch.save(dqn.network.state_dict(), '%s/DQN_iter_%d.pth' % (args.experiment, step))
             if not best_network is None:
-                torch.save(best_network.state_dict(), '%s/X_DQN_iter_%d.pth' % (args.experiment, step))
+                torch.save(best_network.state_dict(), '%s/X_DQN.pth' % (args.experiment))
 
             with open(os.path.join(args.experiment, 'log'), 'w') as f:
                 f.write(pprint.pformat(history))
