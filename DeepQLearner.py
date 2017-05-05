@@ -30,7 +30,7 @@ class DeepQLearner(object):
         self.r_max = 1
         self.args = args
         self.transitions = TransitionManager(self.args)
-        self.last_state, self.last_action, self.last_done = None, None, None
+        self.last_state, self.last_action = None, None
 
         self.network = nn.Sequential(
             nn.Conv2d(self.args.n_input_channels, 32, 8, 4, 1),
@@ -58,24 +58,26 @@ class DeepQLearner(object):
 
         return input
 
-    def reset(self, reward):
+    def reset(self, reward, test=False):
         self.transitions.reset_recent()
 
-        if not self.args.no_rescale_reward:
+        if not self.args.no_rescale_reward and not test:
             self.r_max = max(self.r_max, reward)
-        if not self.last_state is None:
+        if not self.last_state is None and not test:
             reward = np.clip(reward, self.args.min_reward, self.args.max_reward)
-            self.transitions.add(self.last_state, self.last_action, reward, self.last_done)
+            self.transitions.add(self.last_state, self.last_action, reward, False)
             self.transitions.add(self.last_state, self.last_action, 0, True)
 
-        self.last_state, self.last_action, self.last_done = None, None, None
+        self.last_state, self.last_action = None, None
 
     def perceive(self, raw_state, reward, done, n_steps, test=False, test_eps=None):
+        assert(not done)
+
         state = self.preprocess(raw_state)
 
-        self.transitions.add_recent_state(state, done)
+        self.transitions.add_recent_state(state, False)
         cur_full_state = self.transitions.get_recent()[np.newaxis,:,:,:]
-        action = 0 if done else self.e_greedy(cur_full_state, n_steps, test_eps)
+        action = self.e_greedy(cur_full_state, n_steps, test_eps)
         self.transitions.add_recent_action(action)
         
         if test:
@@ -85,11 +87,10 @@ class DeepQLearner(object):
             self.r_max = max(self.r_max, reward)
         if not self.last_state is None:
             reward = np.clip(reward, self.args.min_reward, self.args.max_reward)
-            self.transitions.add(self.last_state, self.last_action, reward, self.last_done)
+            self.transitions.add(self.last_state, self.last_action, reward, False)
 
         self.last_action = action
         self.last_state = state
-        self.last_done = done
 
         if n_steps > self.args.learn_start and n_steps % self.args.update_freq == 0:
             self.args.lr = max((self.args.lr_start-self.args.lr_end)*(self.args.lr_end_time-max(0, n_steps-self.args.learn_start))/self.args.lr_end_time

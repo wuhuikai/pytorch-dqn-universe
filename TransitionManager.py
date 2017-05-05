@@ -25,7 +25,7 @@ class TransitionManager(object):
         self.next_state_buffer = torch.FloatTensor(self.args.buffer_size, self.args.n_input_channels, self.args.im_size, self.args.im_size).zero_()
         self.done_buffer = torch.FloatTensor(self.args.buffer_size).zero_()
         if self.args.gpu >= 0:
-            self.state_buffer, self.next_state_buffer, self.reward_buffer, self.action_buffer, sel.done_buffer = self.state_buffer.cuda(self.args.gpu), self.next_state_buffer.cuda(self.args.gpu), self.reward_buffer.cuda(self.args.gpu), self.action_buffer.cuda(self.args.gpu), self.done_buffer.cuda(self.args.gpu)
+            self.state_buffer, self.next_state_buffer, self.reward_buffer, self.action_buffer, self.done_buffer = self.state_buffer.cuda(self.args.gpu), self.next_state_buffer.cuda(self.args.gpu), self.reward_buffer.cuda(self.args.gpu), self.action_buffer.cuda(self.args.gpu), self.done_buffer.cuda(self.args.gpu)
 
         self.recent_states = []
         self.recent_dones = []

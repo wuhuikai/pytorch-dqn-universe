@@ -16,13 +16,6 @@ from universe import wrappers
 
 from DeepQLearner import DeepQLearner
 
-def reset(env):
-    observation_n = env.reset()
-    while observation_n[0] == None or np.sum(observation_n[0]['vision']) == 0:
-        observation_n, reward_n, done_n, info = env.step([env.action_space.sample()])
-
-    return observation_n, reward_n, done_n, info
-
 def main():
     parser = argparse.ArgumentParser(description='Deep Reinforcement Learning')
     parser.add_argument('--game_name', required=True, help='Name of the game to play')
@@ -84,6 +77,7 @@ def main():
     env = gym.make(args.game_name)
     env.configure(remotes=1)
     env = wrappers.experimental.SafeActionSpace(env)
+    env = wrappers.BlockingReset(env)
 
     args.n_actions = len(env.action_space.actions)
 
@@ -92,7 +86,7 @@ def main():
     history = []
     best_network = None
     
-    observation_n, reward_n, done_n, info = reset(env)
+    observation_n, reward_n, done_n = env.reset(), [0], [False]
     for step in range(args.n_steps):
         if step % 1000 == 0:
             print('#'*10)
@@ -102,21 +96,20 @@ def main():
         action = dqn.perceive(observation_n[0]['vision'], reward_n[0], done_n[0], step)
 
         for _ in range(args.action_repeat):
-            observation_n, reward_n, done_n, info = env.step([env.action_space[action]])
+            observation_n, reward_n, done_n, _ = env.step([env.action_space[action]])
             if done_n[0]:
                 dqn.reset(reward_n[0])
-                observation_n, reward_n, done_n, info = reset(env)
+                observation_n, reward_n, done_n, _ = env.step([[]])
                 break
 
         if step == args.learn_start:
             state_eval, action_eval, rewards_eval, next_state_eval, done_eval = dqn.transitions.sample(args.eval_size)
             state_eval, action_eval, rewards_eval, next_state_eval, done_eval = state_eval.clone(), action_eval.clone(), rewards_eval.clone(), next_state_eval.clone(), done_eval.clone()
 
-
         if step % args.eval_intervel == 0 and step > args.learn_start:
             total_reward, n_episodes = 0, 0
         
-            eval_observation_n, eval_reward_n, eval_done_n, _ = reset(env)
+            eval_observation_n, eval_reward_n, eval_done_n = env.reset(), [0], [False]
             for eval_step in range(args.eval_steps):
                 eval_action = dqn.perceive(eval_observation_n[0]['vision'], eval_reward_n[0], eval_done_n[0], eval_step, True, 0.05)
 
@@ -125,8 +118,11 @@ def main():
                     total_reward += eval_reward_n[0]
                     if eval_done_n[0]:
                         n_episodes += 1
-                        eval_observation_n, eval_reward_n, eval_done_n, _ = reset(env)
+                        dqn.reset(eval_reward_n[0], test=True)
+                        eval_observation_n, eval_reward_n, eval_done_n, _ = env.step([[]])
                         break
+
+            observation_n, reward_n, done_n = env.reset(), [0], [False]
 
             total_reward /= max(1, n_episodes)
             best_reward = None if len(history) == 0 else history[-1]['best_reward']
