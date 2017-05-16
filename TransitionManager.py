@@ -106,13 +106,13 @@ class TransitionManager(object):
     def sample_one(self):
         while True:
             idx = np.random.randint(0, self.n_states - self.args.recent_mem_size)
-            if not self.dones[idx+self.hist_idx[-1]]:
+            if not self.dones[idx+self.args.hist_idx[-1]]:
                 break
 
         return self.get(idx)
 
     def get(self, idx):
-        action_reward_idx = idx + self.hist_idx[-1]
+        action_reward_idx = idx + self.args.hist_idx[-1]
         return self.concat_frames(idx), self.actions[action_reward_idx], self.rewards[action_reward_idx], self.concat_frames(idx+1), self.dones[action_reward_idx+1]
 
     def fill_buffer(self):
