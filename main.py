@@ -11,15 +11,12 @@ import numpy as np
 import torch
 
 import gym
-import universe
-from universe import wrappers
 
 from DeepQLearner import DeepQLearner
 
 def main():
     parser = argparse.ArgumentParser(description='Deep Reinforcement Learning')
     parser.add_argument('--game_name', required=True, help='Name of the game to play')
-    parser.add_argument('--valid_size', type=int, nargs='+', default=(195, 160), help='Valid aera')
 
     parser.add_argument('--lr', type=float, default=0.00025)
     parser.add_argument('--discount', type=float, default=0.99)
@@ -75,31 +72,34 @@ def main():
 
     # Init universe
     env = gym.make(args.game_name)
-    env.configure(remotes=1)
-    env = wrappers.experimental.SafeActionSpace(env)
-    env = wrappers.BlockingReset(env)
-
-    args.n_actions = len(env.action_space.actions)
+    
+    args.n_actions = env.action_space.n
 
     dqn = DeepQLearner(args)
 
     history = []
+    reward_history = [0]
     best_network = None
     
-    observation_n, reward_n, done_n = env.reset(), [0], [False]
+    observation_n, reward_n, done_n = env.reset(), 0, False
     for step in range(args.n_steps):
         if step % 1000 == 0:
             print('#'*10)
             print('Step: {}'.format(step))
             print('#'*10)
 
-        action = dqn.perceive(observation_n[0]['vision'], reward_n[0], done_n[0], step)
+        action = dqn.perceive(observation_n, reward_n, done_n, step)
 
         for _ in range(args.action_repeat):
-            observation_n, reward_n, done_n, _ = env.step([env.action_space[action]])
-            if done_n[0]:
-                dqn.reset(reward_n[0])
-                observation_n, reward_n, done_n, _ = env.step([[]])
+            observation_n, reward_n, done_n, _ = env.step(action)
+            reward_history[-1] += reward_n
+            if done_n:
+                print('\tIter:{}, Best score: {}, Avg score: {}'.format(len(reward_history), np.max(reward_history), np.mean(reward_history)))
+                dqn.vis.line(np.asarray(reward_history), win=1)
+                reward_history.append(0)
+
+                dqn.reset(reward_n)
+                observation_n, reward_n, done_n = env.reset(), 0, False
                 break
 
         if step == args.learn_start:
@@ -109,20 +109,21 @@ def main():
         if step % args.eval_intervel == 0 and step > args.learn_start:
             total_reward, n_episodes = 0, 0
         
-            eval_observation_n, eval_reward_n, eval_done_n = env.reset(), [0], [False]
+            eval_observation_n, eval_reward_n, eval_done_n = env.reset(), 0, False
             for eval_step in range(args.eval_steps):
-                eval_action = dqn.perceive(eval_observation_n[0]['vision'], eval_reward_n[0], eval_done_n[0], eval_step, True, 0.05)
+                eval_action = dqn.perceive(eval_observation_n, eval_reward_n, eval_done_n, eval_step, True, 0.05)
 
                 for _ in range(args.action_repeat):
-                    eval_observation_n, eval_reward_n, eval_done_n, _ = env.step([env.action_space[eval_action]])   
-                    total_reward += eval_reward_n[0]
-                    if eval_done_n[0]:
+                    eval_observation_n, eval_reward_n, eval_done_n, _ = env.step(eval_action)   
+                    total_reward += eval_reward_n
+                    if eval_done_n:
                         n_episodes += 1
-                        dqn.reset(eval_reward_n[0], test=True)
-                        eval_observation_n, eval_reward_n, eval_done_n, _ = env.step([[]])
+                        dqn.reset(eval_reward_n, test=True)
+                        eval_observation_n, eval_reward_n, eval_done_n = env.reset(), 0, False
                         break
 
-            observation_n, reward_n, done_n = env.reset(), [0], [False]
+            observation_n, reward_n, done_n = env.reset(), 0, False
+            reward_history.append(0)
 
             total_reward /= max(1, n_episodes)
             best_reward = None if len(history) == 0 else history[-1]['best_reward']
@@ -147,6 +148,8 @@ def main():
 
             with open(os.path.join(args.experiment, 'log'), 'w') as f:
                 f.write(pprint.pformat(history))
+            with open(os.path.join(args.experiment, 'rlog'), 'w') as f:
+                f.write(pprint.pformat(reward_history))
 
 if __name__ == '__main__':
     main()

@@ -1,5 +1,7 @@
 import copy
 
+import time
+
 import numpy as np
 
 import torch
@@ -11,6 +13,8 @@ from torch.autograd import Variable
 
 from skimage.color import rgb2yuv
 from skimage.transform import resize
+
+import visdom
 
 from TransitionManager import TransitionManager
 
@@ -26,6 +30,11 @@ class DeepQLearner(object):
         args.lr_end_time = 1000000
         args.eps = args.eps_start
         args.weight_decay = 0
+
+
+        self.vis = visdom.Visdom(env=args.game_name)
+        self.fps = 1./10
+        self.time = time.time()
 
         self.r_max = 1
         self.args = args
@@ -52,7 +61,12 @@ class DeepQLearner(object):
         self.target_network = copy.deepcopy(self.network)
 
     def preprocess(self, input):
-        input = input[:self.args.valid_size[0], :self.args.valid_size[1], :]
+        input = np.asarray(input)
+
+        if time.time() - self.time > self.fps:
+            self.time = time.time()
+            self.vis.image(input.transpose((2, 0, 1)), win=0)
+
         input = resize(input, (self.args.im_size, self.args.im_size), mode='reflect')
         input = rgb2yuv(input)[:,:,0]
 
