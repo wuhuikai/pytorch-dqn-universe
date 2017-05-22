@@ -17,6 +17,7 @@ from DeepQLearner import DeepQLearner
 def main():
     parser = argparse.ArgumentParser(description='Deep Reinforcement Learning')
     parser.add_argument('--game_name', required=True, help='Name of the game to play')
+    parser.add_argument('--game_actions', nargs='+', required=True, type=int, help='Actions in the game')
 
     parser.add_argument('--lr', type=float, default=0.00025)
     parser.add_argument('--discount', type=float, default=0.99)
@@ -29,7 +30,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=32)
 
     parser.add_argument('--update_freq', type=int, default=4)
-    parser.add_argument('--action_repeat', type=int, default=4)
+    parser.add_argument('--action_repeat', type=int, default=1)
     parser.add_argument('--n_replay', type=int, default=1, help='# of replays per update')
     
     parser.add_argument('--replay_memory', type=int, default=1000000, help='Size of replay memory')
@@ -73,7 +74,7 @@ def main():
     # Init universe
     env = gym.make(args.game_name)
     
-    args.n_actions = env.action_space.n
+    args.n_actions = len(args.game_actions)
 
     dqn = DeepQLearner(args)
 
@@ -91,7 +92,7 @@ def main():
         action = dqn.perceive(observation_n, reward_n, done_n, step)
 
         for _ in range(args.action_repeat):
-            observation_n, reward_n, done_n, _ = env.step(action)
+            observation_n, reward_n, done_n, _ = env.step(args.game_actions[action])
             reward_history[-1] += reward_n
             if done_n:
                 print('\tIter:{}, Best score: {}, Avg score: {}'.format(len(reward_history), np.max(reward_history), np.mean(reward_history)))
@@ -114,7 +115,7 @@ def main():
                 eval_action = dqn.perceive(eval_observation_n, eval_reward_n, eval_done_n, eval_step, True, 0.05)
 
                 for _ in range(args.action_repeat):
-                    eval_observation_n, eval_reward_n, eval_done_n, _ = env.step(eval_action)   
+                    eval_observation_n, eval_reward_n, eval_done_n, _ = env.step(args.game_actions[eval_action])   
                     total_reward += eval_reward_n
                     if eval_done_n:
                         n_episodes += 1
