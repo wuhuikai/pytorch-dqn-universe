@@ -32,7 +32,7 @@ class DeepQLearner(object):
         args.weight_decay = 0
 
 
-        self.vis = visdom.Visdom(env=args.game_name)
+        self.vis = visdom.Visdom(env='DQN:'+args.game_name)
         self.fps = 1./10
         self.time = time.time()
 

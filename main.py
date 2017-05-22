@@ -79,25 +79,28 @@ def main():
     dqn = DeepQLearner(args)
 
     history = []
-    reward_history = [0]
+    best_score = None
+    reward_history = [0]*args.target_q_update_freq
+    running_reward = [0]*args.target_q_update_freq
     best_network = None
     
     observation_n, reward_n, done_n = env.reset(), 0, False
     for step in range(args.n_steps):
-        if step % 1000 == 0:
-            print('#'*10)
-            print('Step: {}'.format(step))
-            print('#'*10)
-
         action = dqn.perceive(observation_n, reward_n, done_n, step)
 
         for _ in range(args.action_repeat):
             observation_n, reward_n, done_n, _ = env.step(args.game_actions[action])
             reward_history[-1] += reward_n
             if done_n:
-                print('\tIter:{}, Best score: {}, Avg score: {}'.format(len(reward_history), np.max(reward_history), np.mean(reward_history)))
-                dqn.vis.line(np.asarray(reward_history), win=1)
+                best_score = reward_history[-1] if best_score is None else max(best_score, reward_history[-1])
+                running_reward.append(0.99*running_reward[-1]+0.01*reward_history[-1])
+                running_reward.pop(0)
+
+                print('Step:{},\tBest score: {},\tAvg score: {},\tRunning Avg score: {}'.format(step, best_score, np.mean(reward_history), running_reward[-1]))
+                dqn.vis.line(np.asarray([reward_history, running_reward]).transpose(), win=1, opts={'legend':['reward', 'running average']})
+                
                 reward_history.append(0)
+                reward_history.pop(0)
 
                 dqn.reset(reward_n)
                 observation_n, reward_n, done_n = env.reset(), 0, False
@@ -124,7 +127,7 @@ def main():
                         break
 
             observation_n, reward_n, done_n = env.reset(), 0, False
-            reward_history.append(0)
+            reward_history[-1] = 0
 
             total_reward /= max(1, n_episodes)
             best_reward = None if len(history) == 0 else history[-1]['best_reward']
